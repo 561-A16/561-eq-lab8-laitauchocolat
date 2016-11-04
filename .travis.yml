@@ -5,8 +5,21 @@ language: csharp
 services:
   - docker
 
-before_install:
-  - docker build -t webapp:test -f Docker/Dockerfile .
+addons:
+  apt: 
+    packages:
+      - sshpass
 
 script:
-  - docker run -it --rm webapp:test
+  - docker build -t webapp:test -f ./dockerfile/test .
+  - docker run -it --rm -v $PWD/publish:/root/publish -v $PWD/packages:/root/.nuget/packages webapp:test
+
+after_success:
+  - docker build -t webapp:release -f ./dockerfile/release .
+  - docker tag webapp:release juju69/webapp:latest
+  - docker login -u=$USERNAME -p=$PASSWORD
+  - docker push juju69/webapp:latest
+  - export SSHPASS=$SSH_PASSWORD
+  - sshpass -e scp -o StrictHostKeyChecking=no $PWD/scripts/releaseTestServer.sh u1333103@159.203.33.172:/home/u1333103
+  - sshpass -e ssh u1333103@159.203.33.172 'chmod +x releaseTestServer.sh'
+  - sshpass -e ssh u1333103@159.203.33.172 'sh releaseTestServer.sh'
